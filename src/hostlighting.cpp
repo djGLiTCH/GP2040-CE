@@ -204,8 +204,25 @@ static void stageRange(const LedRange & range, uint32_t colour) {
 // addressing the control should light all of them. Returns false when the
 // control has no light at all. GET_CAPS reports the first range per control,
 // since its map holds one range per button ID.
+// The GPIO action behind any stageable button ID, the extended set included;
+// GpioAction::NONE for IDs that are not action buttons (the specials, and the
+// permanently unassigned 20-23).
+static GpioAction actionForButtonId(uint8_t buttonId) {
+	if (buttonId < HOST_LIGHTING_BUTTON_COUNT)
+		return canonicalAction[buttonId];
+	if (buttonId == HOST_LIGHTING_BUTTON_A3)
+		return GpioAction::BUTTON_PRESS_A3;
+	if (buttonId == HOST_LIGHTING_BUTTON_A4)
+		return GpioAction::BUTTON_PRESS_A4;
+	if ((buttonId >= HOST_LIGHTING_BUTTON_E1) && (buttonId <= HOST_LIGHTING_BUTTON_E12))
+		return (GpioAction)((int)GpioAction::BUTTON_PRESS_E1
+			+ (buttonId - HOST_LIGHTING_BUTTON_E1));
+	return GpioAction::NONE;
+}
+
 static bool stageButton(uint8_t buttonId, uint32_t colour) {
-	if (buttonId >= HOST_LIGHTING_BUTTON_COUNT) {
+	GpioAction action = actionForButtonId(buttonId);
+	if (action == GpioAction::NONE) {
 		LedRange range = resolveButton(buttonId);
 		if (range.first < 0)
 			return false;
@@ -223,7 +240,7 @@ static bool stageButton(uint8_t buttonId, uint32_t colour) {
 		if ((light.type != LightType::LightType_ActionButton) ||
 				(light.gpioPin < 0) || (light.gpioPin >= (int32_t)NUM_BANK0_GPIOS))
 			continue;
-		if (pinMappings[light.gpioPin].action != canonicalAction[buttonId])
+		if (pinMappings[light.gpioPin].action != action)
 			continue;
 		LedRange range = { (int16_t)light.first, light.count };
 		stageRange(range, colour);
@@ -753,6 +770,35 @@ void HostLighting::setReport(uint8_t report_id, hid_report_type_t report_type, c
 					applied++;
 				else
 					skipped++;
+			}
+			responseBuffer[3] = applied;
+			responseBuffer[4] = skipped;
+			break;
+		}
+
+		case HOST_LIGHTING_CMD_SET_LIGHT: {
+			// Stages one light per entry by its page 5 ordinal. On this
+			// pipeline an ordinal is an index into the light registry, which
+			// is exactly the order page 5 reports.
+			if (bufsize < 3) { status = HOST_LIGHTING_STATUS_INVALID_ARG; break; }
+			uint8_t entries = buffer[2];
+			if ((entries == 0) || (entries > HOST_LIGHTING_SET_LIGHT_MAX_ENTRIES) ||
+					(bufsize < (uint16_t)(3 + entries * 4))) {
+				status = HOST_LIGHTING_STATUS_INVALID_ARG;
+				break;
+			}
+			uint8_t applied = 0, skipped = 0;
+			for (uint8_t e = 0; e < entries; e++) {
+				const uint8_t * entry = &buffer[3 + e * 4];
+				if (!lightsReady || (entry[0] >= registeredLightCount)) {
+					skipped++;
+					continue;
+				}
+				const RegisteredLight & light = registeredLights[entry[0]];
+				LedRange range = { (int16_t)light.first, light.count };
+				stageRange(range,
+					((uint32_t)entry[1] << 16) | ((uint32_t)entry[2] << 8) | entry[3]);
+				applied++;
 			}
 			responseBuffer[3] = applied;
 			responseBuffer[4] = skipped;
