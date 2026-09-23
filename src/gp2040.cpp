@@ -3,6 +3,7 @@
 // GP2040 includes
 #include "gp2040.h"
 #include "helper.h"
+#include "hostlighting.h"
 #include "system.h"
 #include "enums.pb.h"
 
@@ -160,6 +161,10 @@ void GP2040::setup() {
 	// register system event handlers
 	EventManager::getInstance().registerEventHandler(GP_EVENT_STORAGE_SAVE, GPEVENT_CALLBACK(this->handleStorageSave(event)));
 	EventManager::getInstance().registerEventHandler(GP_EVENT_RESTART, GPEVENT_CALLBACK(this->handleSystemReboot(event)));
+
+	// Registers its event handler: must run before core 1 starts. The
+	// expander's pins are inputs only if its add-on loaded (chip found).
+	HostLighting::setup(addons.GetAddon(PCF8575AddonName) != nullptr);
 }
 
 /**
@@ -306,6 +311,9 @@ void GP2040::run() {
 
 		// TinyUSB Task update
 		tud_task();
+
+		// Host Lighting: expiry, events and queued replies
+		HostLighting::task();
 
 		// Post-Process Add-ons with USB Report Processed Sent
 		addons.PostprocessAddons(processed);
