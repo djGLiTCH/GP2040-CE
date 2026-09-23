@@ -63,11 +63,27 @@ public:
   void SetMaxBrightness(uint8_t max);
   float GetNormalisedBrightness();
   uint8_t GetBrightnessStepValue();
+  uint8_t GetMaxBrightness() { return brightnessMax; }
   void SetBrightnessStepValue(uint8_t brightness);
   void ApplyBrightnessStepValue();
   void DecreaseBrightnessByStep();
   void IncreaseBrightnessByStep();
   void DimBrightnessTo0();
+
+  // The running animations re-read their profile's speeds
+  void CycleParameterChange() {
+    if (baseAnimation != nullptr)
+      baseAnimation->CycleParameterChange();
+    if (caseAnimation != nullptr)
+      caseAnimation->CycleParameterChange();
+    if (buttonAnimation != nullptr)
+      buttonAnimation->CycleParameterChange();
+  }
+
+  // A change to the animation options made outside HandleEvent() is saved
+  // as a hotkey's is
+  void OptionsChanged() { bChangeDetected = true; }
+
   void CheckForOptionsUpdate();
  
   //Testing/webconfig

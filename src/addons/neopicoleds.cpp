@@ -15,6 +15,7 @@
 #include "usbdriver.h"
 #include "enums.h"
 #include "helper.h"
+#include "hostlighting.h"
 #include "animation.h"
 
 const std::string BUTTON_LABEL_UP = "Up";
@@ -258,6 +259,10 @@ void NeoPicoLEDAddon::setup() {
 	AnimStation.InitSettings();
 	configureLEDs();
 
+	// Host Lighting reads this layout while its interface exists; it is
+	// final before core 0 starts USB
+	HostLighting::registerLights(RGBLights, (uint16_t)((intervalMS > 0) ? (1000 / intervalMS) : 0));
+
 	// Next Run
     nextRunTime = make_timeout_time_ms(0); // Reset timeout
 }
@@ -275,6 +280,8 @@ void NeoPicoLEDAddon::process()
 		neopico.Show();
 		AnimStation.InitSettings();
 		configureLEDs();
+
+		HostLighting::registerLights(RGBLights, (uint16_t)((intervalMS > 0) ? (1000 / intervalMS) : 0));
 
 		//Restore saved profile if applicable
 		if(AnimStation.getTestMode() != AnimationStationTestMode::AnimationStation_TestModeDisableTestMode)
@@ -356,6 +363,10 @@ void NeoPicoLEDAddon::process()
 
 	UpdatePlayerLEDs();
 	UpdateTurboLED();
+
+	// Host Lighting: host animation, speed and brightness requests, then a
+	// live host frame over the animations
+	HostLighting::render(AnimStation, frame, neopico.GetFormat());
 
 	//Set led values out to the actual leds
 	neopico.SetFrame(frame);
