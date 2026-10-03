@@ -1046,35 +1046,35 @@ std::string getLightsPresetsByIndex(int presetIdx)
 
     if(presetIdx == 0 && strcmp(LIGHT_DATA_NAME_DEFAULT, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_DEFAULT };
-        addPreset(LIGHT_DATA_NAME_DEFAULT, lightData, LIGHT_DATA_SIZE_DEFAULT);
+        addPreset(LIGHT_DATA_NAME_DEFAULT, lightData, sizeof(lightData) / 6);
     }
     else if(presetIdx == 1 && strcmp(LIGHT_DATA_NAME_1, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_1 };
-        addPreset(LIGHT_DATA_NAME_1, lightData, LIGHT_DATA_SIZE_1);
+        addPreset(LIGHT_DATA_NAME_1, lightData, sizeof(lightData) / 6);
     }
     else if(presetIdx == 2 && strcmp(LIGHT_DATA_NAME_2, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_2 };
-        addPreset(LIGHT_DATA_NAME_2, lightData, LIGHT_DATA_SIZE_2);
+        addPreset(LIGHT_DATA_NAME_2, lightData, sizeof(lightData) / 6);
     }
     else if(presetIdx == 3 && strcmp(LIGHT_DATA_NAME_3, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_3 };
-        addPreset(LIGHT_DATA_NAME_3, lightData, LIGHT_DATA_SIZE_3);
+        addPreset(LIGHT_DATA_NAME_3, lightData, sizeof(lightData) / 6);
     }
     else if(presetIdx == 4 && strcmp(LIGHT_DATA_NAME_4, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_4 };
-        addPreset(LIGHT_DATA_NAME_4, lightData, LIGHT_DATA_SIZE_4);
+        addPreset(LIGHT_DATA_NAME_4, lightData, sizeof(lightData) / 6);
     }
     else if(presetIdx == 5 && strcmp(LIGHT_DATA_NAME_5, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_5 };
-        addPreset(LIGHT_DATA_NAME_5, lightData, LIGHT_DATA_SIZE_5);
+        addPreset(LIGHT_DATA_NAME_5, lightData, sizeof(lightData) / 6);
     }
     else if(presetIdx == 6 && strcmp(LIGHT_DATA_NAME_6, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_6 };
-        addPreset(LIGHT_DATA_NAME_6, lightData, LIGHT_DATA_SIZE_6);
+        addPreset(LIGHT_DATA_NAME_6, lightData, sizeof(lightData) / 6);
     }
     else if(presetIdx == 7 && strcmp(LIGHT_DATA_NAME_7, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_7 };
-        addPreset(LIGHT_DATA_NAME_7, lightData, LIGHT_DATA_SIZE_7);
+        addPreset(LIGHT_DATA_NAME_7, lightData, sizeof(lightData) / 6);
     }
 
     if (!found) {
@@ -1126,35 +1126,35 @@ std::string getLightsDataPresets()
 
     if(strcmp(LIGHT_DATA_NAME_DEFAULT, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_DEFAULT };
-        addPreset(LIGHT_DATA_NAME_DEFAULT, lightData, LIGHT_DATA_SIZE_DEFAULT);
+        addPreset(LIGHT_DATA_NAME_DEFAULT, lightData, sizeof(lightData) / 6);
     }
     if(strcmp(LIGHT_DATA_NAME_1, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_1 };
-        addPreset(LIGHT_DATA_NAME_1, lightData, LIGHT_DATA_SIZE_1);
+        addPreset(LIGHT_DATA_NAME_1, lightData, sizeof(lightData) / 6);
     }
     if(strcmp(LIGHT_DATA_NAME_2, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_2 };
-        addPreset(LIGHT_DATA_NAME_2, lightData, LIGHT_DATA_SIZE_2);
+        addPreset(LIGHT_DATA_NAME_2, lightData, sizeof(lightData) / 6);
     }
     if(strcmp(LIGHT_DATA_NAME_3, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_3 };
-        addPreset(LIGHT_DATA_NAME_3, lightData, LIGHT_DATA_SIZE_3);
+        addPreset(LIGHT_DATA_NAME_3, lightData, sizeof(lightData) / 6);
     }
     if(strcmp(LIGHT_DATA_NAME_4, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_4 };
-        addPreset(LIGHT_DATA_NAME_4, lightData, LIGHT_DATA_SIZE_4);
+        addPreset(LIGHT_DATA_NAME_4, lightData, sizeof(lightData) / 6);
     }
     if(strcmp(LIGHT_DATA_NAME_5, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_5 };
-        addPreset(LIGHT_DATA_NAME_5, lightData, LIGHT_DATA_SIZE_5);
+        addPreset(LIGHT_DATA_NAME_5, lightData, sizeof(lightData) / 6);
     }
     if(strcmp(LIGHT_DATA_NAME_6, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_6 };
-        addPreset(LIGHT_DATA_NAME_6, lightData, LIGHT_DATA_SIZE_6);
+        addPreset(LIGHT_DATA_NAME_6, lightData, sizeof(lightData) / 6);
     }
     if(strcmp(LIGHT_DATA_NAME_7, "") != 0) {
         const unsigned char lightData[] = { LIGHT_DATA_7 };
-        addPreset(LIGHT_DATA_NAME_7, lightData, LIGHT_DATA_SIZE_7);
+        addPreset(LIGHT_DATA_NAME_7, lightData, sizeof(lightData) / 6);
     }
 
     return serialize_json(outDoc);
