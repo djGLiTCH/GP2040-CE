@@ -18,10 +18,10 @@ void DualDirectionalInput::setup() {
     for (Pin_t pin = 0; pin < (Pin_t)NUM_BANK0_GPIOS; pin++)
     {
         switch (pinMappings[pin].action) {
-            case GpioAction::BUTTON_PRESS_DDI_UP:    mapDpadUp->pinMask |= 1 << pin; break;
-            case GpioAction::BUTTON_PRESS_DDI_DOWN:  mapDpadDown->pinMask |= 1 << pin; break;
-            case GpioAction::BUTTON_PRESS_DDI_LEFT:  mapDpadLeft->pinMask |= 1 << pin; break;
-            case GpioAction::BUTTON_PRESS_DDI_RIGHT: mapDpadRight->pinMask |= 1 << pin; break;
+            case GpioAction::BUTTON_PRESS_DDI_UP:    mapDpadUp->pinMask |= Mask_t{1} << pin; break;
+            case GpioAction::BUTTON_PRESS_DDI_DOWN:  mapDpadDown->pinMask |= Mask_t{1} << pin; break;
+            case GpioAction::BUTTON_PRESS_DDI_LEFT:  mapDpadLeft->pinMask |= Mask_t{1} << pin; break;
+            case GpioAction::BUTTON_PRESS_DDI_RIGHT: mapDpadRight->pinMask |= Mask_t{1} << pin; break;
             default:                                 break;
         }
     }
@@ -177,7 +177,8 @@ uint8_t DualDirectionalInput::SOCDGamepadClean(uint8_t gamepadState, bool isLast
     // Gamepad SOCD Last-Win OR First-Win Clean
     switch (gamepadState & (GAMEPAD_MASK_UP | GAMEPAD_MASK_DOWN)) {
         case (GAMEPAD_MASK_UP | GAMEPAD_MASK_DOWN): // If last state was Up or Down, exclude it from our gamepad
-            if (isLastWin) gamepadState ^= (lastGPUD == DIRECTION_UP) ? GAMEPAD_MASK_UP : GAMEPAD_MASK_DOWN;
+            if (lastGPUD == DIRECTION_NONE) gamepadState ^= (GAMEPAD_MASK_UP | GAMEPAD_MASK_DOWN);
+            else if (isLastWin) gamepadState ^= (lastGPUD == DIRECTION_UP) ? GAMEPAD_MASK_UP : GAMEPAD_MASK_DOWN;
             else gamepadState ^= (lastGPUD == DIRECTION_UP) ? GAMEPAD_MASK_DOWN : GAMEPAD_MASK_UP;
             break;
         case GAMEPAD_MASK_UP:
@@ -198,7 +199,7 @@ uint8_t DualDirectionalInput::SOCDGamepadClean(uint8_t gamepadState, bool isLast
                 if (isLastWin) gamepadState ^= (lastGPLR == DIRECTION_LEFT) ? GAMEPAD_MASK_LEFT : GAMEPAD_MASK_RIGHT;
                 else gamepadState ^= (lastGPLR == DIRECTION_LEFT) ? GAMEPAD_MASK_RIGHT : GAMEPAD_MASK_LEFT;
             else
-                lastGPLR = DIRECTION_NONE;
+                gamepadState ^= (GAMEPAD_MASK_LEFT | GAMEPAD_MASK_RIGHT);
             break;
         case GAMEPAD_MASK_LEFT:
             gamepadState |= GAMEPAD_MASK_LEFT;

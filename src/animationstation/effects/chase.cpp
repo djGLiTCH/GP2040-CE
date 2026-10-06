@@ -306,6 +306,9 @@ void Chase::Animate(RGB (&frame)[FRAME_MAX])
 
 void Chase::AssignThisFrameValues()
 {
+  if (OrderedLights.empty())
+    return;
+
   int currentLightReverseAdjusted = CurrentLight;
 
    //now light the correct lights
