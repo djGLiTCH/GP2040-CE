@@ -26,6 +26,7 @@
 #include "pixel.h"
 #include "NeoPico.h"
 #include "inputmodenames.h"
+#include "addons/he_trigger.h"
 
 // Watchdog scratch register holding the XInput AUTO host verdict (scratch[5]
 // belongs to System::reboot's BootMode)
@@ -786,15 +787,17 @@ struct PageDef {
 	RecordFn record;
 };
 
-// Hall-effect triggers the add-on reads (HETriggerAddon::setup), muxChannels
-// on each of up to four muxes, 32 at most
-uint8_t triggerTotal() {
+// Hall-effect triggers the add-on scans, one bit per trigger
+// (HETriggerAddon::isTriggerScanned)
+uint32_t triggersScanned() {
 	const HETriggerOptions & options = Storage::getInstance().getAddonOptions().heTriggerOptions;
 	int32_t channels = options.muxChannels;
 	if (!options.enabled || ((channels != 1) && (channels != 4) && (channels != 8) && (channels != 16)))
 		return 0;
-	int32_t muxes = 32 / channels;
-	return (uint8_t)(((muxes > 4) ? 4 : muxes) * channels);
+	uint32_t scanned = 0;
+	for (uint32_t i = 0; i < HETRIGGER_COUNT; i++)
+		scanned |= HETriggerAddon::isTriggerScanned(options, i) ? (1u << i) : 0;
+	return scanned;
 }
 
 // Expander pins, while the PCF8575 add-on is loaded
@@ -804,10 +807,16 @@ uint8_t expanderTotal(bool loaded) {
 	return !loaded ? 0 : ((options.pins_count > size) ? size : (uint8_t)options.pins_count);
 }
 
-// Add-on inputs this boot, counted in HostLighting::setup(). Their options
+// Add-on inputs this boot, found in HostLighting::setup(). Their options
 // change only in the web configurator, which reboots
-uint8_t triggerKeys = 0;
+uint32_t scannedTriggers = 0;
 uint8_t expanderKeys = 0;
+
+// Whether a key is a Hall-effect trigger the add-on scans
+bool isScannedTriggerKey(uint16_t key) {
+	return (key >= KEY_TRIGGER) && ((key - KEY_TRIGGER) < HETRIGGER_COUNT) &&
+		(scannedTriggers & (1u << (key - KEY_TRIGGER)));
+}
 
 // The page 10 key of the input a light follows, a GPIO pin or a
 // Hall-effect trigger the add-on reads. -1 when it follows neither.
@@ -815,7 +824,8 @@ int ownerKey(const Light & light) {
 	if (light.InputKey < 0)
 		return -1;
 	if (light.InputSource == LightInputSource::LightInputSource_HallEffect)
-		return (light.InputIndex < triggerKeys) ? (int)KEY_TRIGGER + light.InputIndex : -1;
+		return ((light.InputIndex < HETRIGGER_COUNT) && isScannedTriggerKey(KEY_TRIGGER + light.InputIndex)) ?
+			(int)KEY_TRIGGER + light.InputIndex : -1;
 	return (light.InputIndex < NUM_BANK0_GPIOS) ? (int)light.InputIndex : -1;
 }
 
@@ -823,8 +833,8 @@ int ownerKey(const Light & light) {
 uint16_t nextKey(uint16_t key) {
 	if (++key == NUM_BANK0_GPIOS)
 		key = KEY_TRIGGER;
-	if (key == KEY_TRIGGER + triggerKeys)
-		key = KEY_EXPANDER;
+	while ((key >= KEY_TRIGGER) && (key < KEY_EXPANDER) && !isScannedTriggerKey(key))
+		key++;
 	if (key == KEY_EXPANDER + expanderKeys)
 		key = KEY_END;
 	return key;
@@ -1947,7 +1957,7 @@ void HostLighting::registerLights(const Lights & layout, uint16_t rateHz) {
 		uint16_t y = (uint16_t)(gridCoord(light.Position.YPosition) + 1);
 		width = (x > width) ? x : width;
 		height = (y > height) ? y : height;
-		// From the light itself, as triggerKeys is counted on core 0
+		// From the light itself, as scannedTriggers is found on core 0
 		if (light.InputKey < 0)
 			continue;
 		if (light.InputSource == LightInputSource::LightInputSource_HallEffect)
@@ -2214,7 +2224,7 @@ bool HostLighting::interfaceActive = false;
 bool HostLighting::xinputAutoDetect = false;
 
 void HostLighting::setup(bool expanderInputs) {
-	triggerKeys = triggerTotal();
+	scannedTriggers = triggersScanned();
 	expanderKeys = expanderTotal(expanderInputs);
 
 	// A boot into another mode forgets the XInput AUTO verdict, since the
