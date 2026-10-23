@@ -797,9 +797,9 @@ it until it ends (Session state). Bit 1 is set while the step shown differs
 from the saved step, from an unsaved `SET_BRIGHTNESS` until the step ends.
 Bit 2 is set while the animations' idle timeout
 (`AnimationOptions.autoDisableTime`) has the on-board animations off. A press
-of a lit control (page 10 flag bit 1), or `SET_ANIMATION` changing the
-animation to one other than off, wakes them and restarts the timeout. Frames,
-takeovers and other commands do not.
+of a lit control (page 10 flag bit 1), an animation hotkey, or `SET_ANIMATION`
+changing the animation to one other than off, wakes them and restarts the
+timeout. Frames, takeovers and other commands do not.
 While the animations are off, an overlay's unstaged pixels show only the
 board's RGB player and turbo indicators. Going idle and waking each raise
 `STATE_CHANGED`.
@@ -983,9 +983,10 @@ does not know as a control it cannot name.
 - An add-on input's action comes from its add-on and not from the profile. The
   state token changes whenever it does. The input is listed while its add-on
   runs.
-- The Hall Effect Trigger add-on runs while enabled. It reads `muxChannels`
-  triggers on each of up to four muxes, 32 at most, with `muxChannels` 1, 4, 8
-  or 16. Only those triggers are listed, and none under another `muxChannels`.
+- The Hall Effect Trigger add-on runs while enabled, with `muxChannels` 1, 4,
+  8 or 16. It reads `muxChannels` triggers on each mux it scans that has an ADC
+  pin, 32 at most. Only those triggers are listed, and none under another
+  `muxChannels`.
 - The PCF8575 add-on runs when it is enabled and its chip is found on I2C at
   boot. An expander pin set as an output mirrors a button and is not an input.
 - A light follows a GPIO pin or a Hall-effect trigger. An I/O-expander
