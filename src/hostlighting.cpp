@@ -58,7 +58,7 @@ constexpr uint8_t FLAGS_DEFINED = FLAG_COMMIT_AFTER | FLAG_NO_REPLY | FLAG_KEEPA
 constexpr uint8_t STATUS_OK = 0;
 constexpr uint8_t STATUS_UNSUPPORTED = 1;
 constexpr uint8_t STATUS_INVALID = 2;
-constexpr uint8_t STATUS_STALE_TOKEN = 3;
+constexpr uint8_t STATUS_STALE = 3;
 constexpr uint8_t STATUS_CLAIMED = 4;
 
 // Commands
@@ -77,6 +77,7 @@ constexpr uint8_t CMD_SET_PROFILE = 0x30;
 constexpr uint8_t CMD_SET_ANIMATION = 0x31;
 constexpr uint8_t CMD_SET_ANIMATION_SPEED = 0x32;
 constexpr uint8_t CMD_SET_BRIGHTNESS = 0x33;
+constexpr uint8_t CMD_SET_KEYBOARD_MAPPING = 0x34;
 constexpr uint8_t CMD_SET_INPUT_MODE = 0x70;
 constexpr uint8_t CMD_REBOOT = 0x71;
 // Staging and lifecycle commands refresh the keepalive of a takeover and
@@ -143,8 +144,9 @@ constexpr uint8_t PAGE_NAMES = 3;
 constexpr uint8_t PAGE_SUMMARY = 8;
 constexpr uint8_t PAGE_PROFILES = 9;
 constexpr uint8_t PAGE_CONTROLS = 10;
-constexpr uint8_t PAGE_LIGHTS = 11;
-constexpr uint8_t PAGE_ANIMATIONS = 12;
+constexpr uint8_t PAGE_KEYBOARD_MAPPING = 11;
+constexpr uint8_t PAGE_LIGHTS = 12;
+constexpr uint8_t PAGE_ANIMATIONS = 13;
 
 // GET_PAGE request and the reply header
 constexpr uint8_t GET_PAGE_PAGE = 3;
@@ -164,7 +166,7 @@ constexpr uint8_t RECORD_AREA = 48;
 // Field group widths, in bit order
 constexpr uint8_t IDENTITY_GROUPS = 8;
 constexpr uint8_t IDENTITY_STRING_MAX = 48;
-constexpr uint8_t STATE_GROUPS[] = { 9, CONTROLLER_SIZE, 4 };
+constexpr uint8_t STATE_GROUPS[] = { 10, CONTROLLER_SIZE, 4 };
 constexpr uint8_t INPUT_MODE_GROUPS[] = { 2, 22 };
 constexpr uint8_t NAME_GROUPS[] = { 3, 40 };
 constexpr uint8_t SUMMARY_GROUPS[] = { 30, 8 };
@@ -172,6 +174,7 @@ constexpr uint8_t SUMMARY_GROUPS[] = { 30, 8 };
 constexpr uint8_t CONFIGURATION_PAGES = 8;
 constexpr uint8_t PROFILE_GROUPS[] = { 18 };
 constexpr uint8_t CONTROL_GROUPS[] = { 4, 4, 6, 4 };
+constexpr uint8_t KEYBOARD_MAPPING_GROUPS[] = { 3 };
 constexpr uint8_t LIGHT_GROUPS[] = { 4, 2, 3, 4, 2, 1 };
 constexpr uint8_t ANIMATION_GROUPS[] = { 4, 3 };
 constexpr uint8_t INPUT_MODE_NAME_SIZE = 22;
@@ -214,6 +217,12 @@ constexpr uint8_t SPEED_UNCHANGED = 0xFF;
 constexpr uint8_t SET_BRIGHTNESS_STEP = 3;
 constexpr uint8_t SET_BRIGHTNESS_SAVE = 4;
 constexpr uint8_t BRIGHTNESS_SAVED = 0xFF;
+
+// SET_KEYBOARD_MAPPING request; the codes are consecutive
+constexpr uint8_t SET_KEYBOARD_MAPPING_PROFILE = 3;
+constexpr uint8_t SET_KEYBOARD_MAPPING_FIRST = 4;
+constexpr uint8_t SET_KEYBOARD_MAPPING_COUNT = 6;
+constexpr uint8_t SET_KEYBOARD_MAPPING_CODES = 7;
 
 // Page 1 State flags
 constexpr uint8_t STATE_LIVE = 1 << 0;
@@ -615,6 +624,13 @@ static uint32_t storedProfile() {
 	return Storage::getInstance().getGamepadOptions().profileNumber;
 }
 
+// The profile the pin map was last built from (GP2040::getReinitGamepad),
+// whose mappings the pages report. A switch reaches it at the next
+// main-loop pass, with the token
+static uint32_t appliedProfile() {
+	return Storage::getInstance().GetGamepad()->lastReinitProfileNumber;
+}
+
 // The profile whose pin map a stored number puts in effect, as
 // Storage::setFunctionalPinMappings() selects. A number that is not an
 // enabled alternative profile means the base mapping, profile 1
@@ -656,8 +672,8 @@ struct EnumName {
 
 #define HOST_LIGHTING_ACTION_NAME(name, value) { (int16_t)(value), #name },
 #define HOST_LIGHTING_KIND_NAME(name, value) { (int16_t)(value), #name + sizeof("LightType") },
-static const EnumName actionNames[] = { GpioAction_VALUELIST(HOST_LIGHTING_ACTION_NAME) };
-static const EnumName kindNames[] = { LightType_VALUELIST(HOST_LIGHTING_KIND_NAME) };
+static constexpr EnumName actionNames[] = { GpioAction_VALUELIST(HOST_LIGHTING_ACTION_NAME) };
+static constexpr EnumName kindNames[] = { LightType_VALUELIST(HOST_LIGHTING_KIND_NAME) };
 constexpr bool hasPrefix(const char * text, const char * prefix) {
 	return (*prefix == 0) || ((*text == *prefix) && hasPrefix(text + 1, prefix + 1));
 }
@@ -671,6 +687,75 @@ static_assert((_GpioAction_MIN >= INT16_MIN) && (_GpioAction_MAX <= INT16_MAX),
 	"page 3 carries GpioAction values as signed 16-bit");
 constexpr uint16_t ACTION_NAMES = sizeof(actionNames) / sizeof(actionNames[0]);
 constexpr uint16_t KIND_NAMES = sizeof(kindNames) / sizeof(kindNames[0]);
+
+// ---------------------------------------------------------------------------
+// Keyboard mapping (page 11), the fields of KeyboardMapping in their order,
+// each with the action of its button, found by name: keyDpadUp is
+// BUTTON_PRESS_UP and keyButtonB1 BUTTON_PRESS_B1, as KeyboardDriver presses
+// them.
+
+namespace {
+
+constexpr char upperCase(char c) {
+	return ((c >= 'a') && (c <= 'z')) ? (char)(c - 'a' + 'A') : c;
+}
+
+constexpr bool sameKey(const char * field, const char * action) {
+	return (*field == 0) ? (*action == 0) : ((upperCase(*field) == *action) && sameKey(field + 1, action + 1));
+}
+
+// The button a field maps, the name after keyDpad or keyButton
+constexpr const char * keyButton(const char * field) {
+	return hasPrefix(field, "keyDpad") ? field + sizeof("keyDpad") - 1
+		: (hasPrefix(field, "keyButton") ? field + sizeof("keyButton") - 1 : nullptr);
+}
+
+// The BUTTON_PRESS_ action of a field's button; NONE when there is none
+constexpr int16_t keyboardAction(const char * field) {
+	const char * button = keyButton(field);
+	for (const EnumName & entry : actionNames) {
+		if ((button != nullptr) && hasPrefix(entry.name, "BUTTON_PRESS_")
+				&& sameKey(button, entry.name + sizeof("BUTTON_PRESS_") - 1))
+			return entry.value;
+	}
+	return (int16_t)GpioAction::NONE;
+}
+
+struct KeyboardMappingField {
+	int16_t action;
+	uint32_t KeyboardMapping::* code;
+};
+
+#define HOST_LIGHTING_KEYBOARD_FIELD(parent, atype, htype, ltype, name, tag, other) \
+	{ keyboardAction(#name), &KeyboardMapping::name },
+constexpr KeyboardMappingField keyboardMappingFields[] = { KeyboardMapping_FIELDLIST(HOST_LIGHTING_KEYBOARD_FIELD, unused) };
+#undef HOST_LIGHTING_KEYBOARD_FIELD
+constexpr uint8_t KEYBOARD_MAPPING_FIELDS = sizeof(keyboardMappingFields) / sizeof(keyboardMappingFields[0]);
+
+constexpr bool keyboardMappingNamed() {
+	for (const KeyboardMappingField & field : keyboardMappingFields) {
+		if (field.action == (int16_t)GpioAction::NONE)
+			return false;
+	}
+	return true;
+}
+static_assert(keyboardMappingNamed(), "each KeyboardMapping field names the BUTTON_PRESS_ action of its button");
+
+// Page 10 actions join page 11, so each action has at most one field
+constexpr bool keyboardMappingUnique() {
+	for (uint8_t i = 0; i < KEYBOARD_MAPPING_FIELDS; i++) {
+		for (uint8_t j = i + 1; j < KEYBOARD_MAPPING_FIELDS; j++) {
+			if (keyboardMappingFields[i].action == keyboardMappingFields[j].action)
+				return false;
+		}
+	}
+	return true;
+}
+static_assert(keyboardMappingUnique(), "each action has at most one KeyboardMapping field");
+static_assert(SET_KEYBOARD_MAPPING_CODES + KEYBOARD_MAPPING_FIELDS <= REPORT_SIZE,
+	"SET_KEYBOARD_MAPPING carries the whole mapping in one report");
+
+} // namespace
 
 // ---------------------------------------------------------------------------
 // Pages
@@ -831,17 +916,24 @@ uint8_t identityWidth(uint8_t group) {
 // Page 1 - State
 uint16_t oneRecord() { return 1; }
 
+// The D-pad mode Gamepad::process applies, from a held SUSTAIN_DP_MODE_* button
+// or else GamepadOptions.dpadMode
+static uint8_t dpadMode() {
+	return (uint8_t)Storage::getInstance().GetGamepad()->getActiveDpadMode();
+}
+
 void stateRecord(uint16_t, uint16_t groups, Writer & w) {
 	if (groups & (1 << 0)) {
 		w.u8((uint8_t)((liveActive ? STATE_LIVE : 0) | (brightnessUnsaved() ? STATE_UNSAVED : 0) |
 			(animationsIdle() ? STATE_IDLE : 0)));
 		w.u8((uint8_t)DriverManager::getInstance().getInputMode());
-		w.u8(activeProfile(storedProfile()));
+		w.u8(activeProfile(appliedProfile()));
 		w.u8(playerNumber());
 		w.u16(animationIndex());
 		w.u8(shownBrightness());
 		w.u8(takeoverNumber);
 		w.u8(savedBrightness());
+		w.u8(dpadMode());
 	}
 	if (groups & (1 << 1)) {
 		uint8_t holder[CONTROLLER_SIZE];
@@ -956,7 +1048,19 @@ void controlRecord(uint16_t index, uint16_t groups, Writer & w) {
 
 uint16_t controlTotal() { return controlCounts().total; }
 
-// Page 11 - Lights
+// Page 11 - Keyboard mapping. The code is the low byte, as
+// KeyboardDriver::pressKey takes it
+uint16_t keyboardMappingTotal() { return KEYBOARD_MAPPING_FIELDS; }
+
+void keyboardMappingRecord(uint16_t index, uint16_t groups, Writer & w) {
+	if (!(groups & (1 << 0)))
+		return;
+	const KeyboardMappingField & field = keyboardMappingFields[index];
+	w.u16((uint16_t)field.action);
+	w.u8((uint8_t)(Storage::getInstance().getActiveKeyboardMapping().*field.code));
+}
+
+// Page 12 - Lights
 void lightRecord(uint16_t index, uint16_t groups, Writer & w) {
 	const Light & light = lights->AllLights[index];
 	int pin = ownerKey(light);
@@ -1031,7 +1135,7 @@ void profileRecord(uint16_t index, uint16_t groups, Writer & w) {
 	w.text(mapping.profileLabel, PROFILE_LABEL_SIZE);
 }
 
-// Page 12 - Animations
+// Page 13 - Animations
 void animationRecord(uint16_t index, uint16_t groups, Writer & w) {
 	const AnimationProfile & profile = Storage::getInstance().getAnimationOptions().profiles[index];
 	if (groups & (1 << 0)) {
@@ -1054,6 +1158,7 @@ const PageDef pages[] = {
 	{ PAGE_SUMMARY, SUMMARY_GROUPS, sizeof(SUMMARY_GROUPS), oneRecord, summaryRecord },
 	{ PAGE_PROFILES, PROFILE_GROUPS, sizeof(PROFILE_GROUPS), profileTotal, profileRecord },
 	{ PAGE_CONTROLS, CONTROL_GROUPS, sizeof(CONTROL_GROUPS), controlTotal, controlRecord },
+	{ PAGE_KEYBOARD_MAPPING, KEYBOARD_MAPPING_GROUPS, sizeof(KEYBOARD_MAPPING_GROUPS), keyboardMappingTotal, keyboardMappingRecord },
 	{ PAGE_LIGHTS, LIGHT_GROUPS, sizeof(LIGHT_GROUPS), lightCount, lightRecord },
 	{ PAGE_ANIMATIONS, ANIMATION_GROUPS, sizeof(ANIMATION_GROUPS), animationTotal, animationRecord },
 };
@@ -1075,16 +1180,18 @@ const PageDef * findPage(uint8_t number) {
 // counter. The token is the hash of the page hashes, so the same
 // configuration gives the same token.
 // Recomputed on the next use after a change of the inputs, which are the
-// lights and add-on inputs (fixed per boot) and the pin map (profile switch).
+// lights and add-on inputs (fixed per boot), the pin map and keyboard mapping
+// (profile switch) and the keyboard mapping's codes (SET_KEYBOARD_MAPPING).
 static uint32_t stateToken = 1;
 static bool tokenStale = true;
-// The profile whose pin map was last hashed, as the reinit applied it
+// The profile whose pin map and keyboard mapping were last hashed, as the
+// reinit applied it
 // (GP2040::getReinitGamepad, core 0)
 static uint32_t hashedProfile = 0;
 static uint32_t pageHashes[CONFIGURATION_PAGES];
 static bool pagesHashed = false;
 
-// The animation speeds are on page 12 and change at run time (hotkeys on
+// The animation speeds are on page 13 and change at run time (hotkeys on
 // core 1, SET_ANIMATION_SPEED); the token follows them
 static int32_t hashedSpeeds[MAX_ANIMATION_PROFILES][3];
 
@@ -1107,7 +1214,7 @@ static bool speedsChanged() {
 static uint32_t currentToken() {
 	if (speedsChanged())
 		tokenStale = true;
-	const uint32_t profile = Storage::getInstance().GetGamepad()->lastReinitProfileNumber;
+	const uint32_t profile = appliedProfile();
 	if (profile != hashedProfile) {
 		hashedProfile = profile;
 		tokenStale = true;
@@ -1222,8 +1329,8 @@ static void endSession() {
 }
 
 // Page 1 fields that change outside the request path (profile, player,
-// animation, brightness steps, the unsaved and idle flags) and the token, as
-// page 1 last showed them
+// animation, brightness steps, the unsaved and idle flags, the D-pad mode)
+// and the token, as page 1 last showed them
 static uint8_t seenProfile = 0;
 static uint8_t seenPlayer = 0;
 static uint16_t seenAnimation = 0;
@@ -1231,21 +1338,23 @@ static uint8_t seenBrightness = 0;
 static uint8_t seenSaved = 0;
 static bool seenUnsaved = false;
 static bool seenIdle = false;
+static uint8_t seenDpadMode = 0;
 static uint32_t seenToken = 0;
 
 // Records those fields as page 1 shows them now; true when any changed
-static bool noteState(uint32_t number) {
-	uint8_t profile = activeProfile(number);
+static bool noteState() {
+	uint8_t profile = activeProfile(appliedProfile());
 	uint8_t player = playerNumber();
 	uint16_t animation = animationIndex();
 	uint8_t brightness = shownBrightness();
 	uint8_t saved = savedBrightness();
 	bool unsaved = brightnessUnsaved();
 	bool idle = animationsIdle();
+	uint8_t dpad = dpadMode();
 	uint32_t token = currentToken();
 	bool changed = (profile != seenProfile) || (player != seenPlayer) || (animation != seenAnimation) ||
 		(brightness != seenBrightness) || (saved != seenSaved) || (unsaved != seenUnsaved) || (idle != seenIdle) ||
-		(token != seenToken);
+		(dpad != seenDpadMode) || (token != seenToken);
 	seenProfile = profile;
 	seenPlayer = player;
 	seenAnimation = animation;
@@ -1253,6 +1362,7 @@ static bool noteState(uint32_t number) {
 	seenSaved = saved;
 	seenUnsaved = unsaved;
 	seenIdle = idle;
+	seenDpadMode = dpad;
 	seenToken = token;
 	return changed;
 }
@@ -1279,7 +1389,7 @@ static void drain() {
 		if (tud_hid_n_report((uint8_t)instance, 0, event, REPORT_SIZE)) {
 			eventPending = false;
 			// The event shows page 1 as it is now, so no second event for the same values
-			noteState(storedProfile());
+			noteState();
 		}
 	}
 }
@@ -1339,7 +1449,7 @@ uint8_t cmdGetPage(const uint8_t * req, uint8_t * reply) {
 		reply[HEADER_PAGE] = number;
 		put16(&reply[HEADER_START], start);
 		put32(&reply[HEADER_TOKEN], token);
-		return STATUS_STALE_TOKEN;
+		return STATUS_STALE;
 	}
 	buildPage(reply, number, start, get16(&req[GET_PAGE_MASK]));
 	return STATUS_OK;
@@ -1400,20 +1510,16 @@ uint8_t cmdConfigure(const uint8_t * req, uint8_t * reply) {
 // switch, a speed change), compared as page 1 shows them. The only detector
 // for these, so one change raises one event.
 void watchState() {
-	// A profile switch reaches +2 before its reinit (GP2040::getReinitGamepad,
-	// next main-loop pass) changes the token. Wait for the reinit, so one
-	// event carries both. One read of the stored number for both uses.
-	const uint32_t number = storedProfile();
-	if (number != Storage::getInstance().GetGamepad()->lastReinitProfileNumber)
-		return;
-	if (noteState(number))
+	// +2 and the token follow the applied profile, so a switch raises one
+	// event carrying both
+	if (noteState())
 		raiseEvent();
 }
 
 uint8_t cmdSubscribe(const uint8_t * req, uint8_t * reply) {
 	uint16_t added = (uint16_t)(get16(&req[3]) & EVENTS_DEFINED);
 	if (subscription == 0 && added != 0)
-		noteState(storedProfile());
+		noteState();
 	subscription |= added;
 	put16(&reply[3], subscription);
 	return STATUS_OK;
@@ -1546,8 +1652,8 @@ uint8_t cmdSetProfile(const uint8_t * req, uint8_t * reply) {
 		return STATUS_OK;
 	if (!storage.setProfile(req[3]))
 		return invalid(reply, 3);
-	// Saved as the profile hotkeys save; the pin map, the token and the
-	// event follow at the next main-loop pass, after the reinit
+	// Saved as the profile hotkeys save. State +2, the pin map, the token and
+	// the event follow at the next main-loop pass, after the reinit
 	// (GP2040::getReinitGamepad)
 	EventManager::getInstance().triggerEvent(new GPStorageSaveEvent(true));
 	return STATUS_OK;
@@ -1626,6 +1732,39 @@ uint8_t cmdSetBrightness(const uint8_t * req, uint8_t * reply) {
 	return STATUS_OK;
 }
 
+// Codes of the active profile's keyboard mapping, live (KeyboardDriver reads
+// it for every report) and saved as the profile hotkeys save. A code equal
+// to the one page 11 shows is left as stored. The command names the profile
+// it expects, as page 1 shows it, and is refused as stale under another, and
+// until a profile switch applies (GP2040::getReinitGamepad), when the active
+// mapping is still the old profile's.
+uint8_t cmdSetKeyboardMapping(const uint8_t * req, uint8_t * reply) {
+	const uint16_t first = get16(&req[SET_KEYBOARD_MAPPING_FIRST]);
+	const uint8_t count = req[SET_KEYBOARD_MAPPING_COUNT];
+	if (first >= KEYBOARD_MAPPING_FIELDS)
+		return invalid(reply, SET_KEYBOARD_MAPPING_FIRST);
+	if ((count == 0) || (count > (uint16_t)(KEYBOARD_MAPPING_FIELDS - first)))
+		return invalid(reply, SET_KEYBOARD_MAPPING_COUNT);
+	const uint32_t applied = appliedProfile();
+	if ((storedProfile() != applied) || (req[SET_KEYBOARD_MAPPING_PROFILE] != activeProfile(applied)))
+		return STATUS_STALE;
+	KeyboardMapping & mapping = Storage::getInstance().getActiveKeyboardMapping();
+	bool changed = false;
+	for (uint8_t i = 0; i < count; i++) {
+		uint32_t & code = mapping.*keyboardMappingFields[first + i].code;
+		const uint8_t value = req[SET_KEYBOARD_MAPPING_CODES + i];
+		if ((uint8_t)code != value) {
+			code = value;
+			changed = true;
+		}
+	}
+	if (changed) {
+		tokenStale = true;
+		EventManager::getInstance().triggerEvent(new GPStorageSaveEvent(true));
+	}
+	return STATUS_OK;
+}
+
 uint8_t cmdSetInputMode(const uint8_t * req, uint8_t * reply) {
 	InputMode mode = (InputMode)req[3];
 	if (!listedInputMode(mode))
@@ -1678,6 +1817,7 @@ const Command commands[] = {
 	{ CMD_SET_ANIMATION, cmdSetAnimation },
 	{ CMD_SET_ANIMATION_SPEED, cmdSetAnimationSpeed },
 	{ CMD_SET_BRIGHTNESS, cmdSetBrightness },
+	{ CMD_SET_KEYBOARD_MAPPING, cmdSetKeyboardMapping },
 	{ CMD_SET_INPUT_MODE, cmdSetInputMode },
 	{ CMD_REBOOT, cmdReboot },
 };
