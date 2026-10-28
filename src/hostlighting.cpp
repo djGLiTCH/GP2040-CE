@@ -624,14 +624,14 @@ static uint32_t storedProfile() {
 	return Storage::getInstance().getGamepadOptions().profileNumber;
 }
 
-// The profile the pin map was last built from (GP2040::getReinitGamepad),
-// whose mappings the pages report. A switch reaches it at the next
+// The profile the pin map was last built from (GP2040::getReinitGamepad).
+// The pages report its mappings. A switch reaches it at the next
 // main-loop pass, with the token
 static uint32_t appliedProfile() {
 	return Storage::getInstance().GetGamepad()->lastReinitProfileNumber;
 }
 
-// The profile whose pin map a stored number puts in effect, as
+// The profile with the pin map a stored number puts in effect, as
 // Storage::setFunctionalPinMappings() selects. A number that is not an
 // enabled alternative profile means the base mapping, profile 1
 static uint8_t activeProfile(uint32_t number) {
@@ -1176,7 +1176,7 @@ const PageDef * findPage(uint8_t number) {
 // State token and change counters. Each configuration page (8-15) is
 // hashed, FNV-1a over every record with all groups as the page writers
 // produce them (the Summary without its change counters), so a hash covers
-// exactly what its page reports. A page whose hash moved steps its change
+// exactly what its page reports. A page with a moved hash steps its change
 // counter. The token is the hash of the page hashes, so the same
 // configuration gives the same token.
 // Recomputed on the next use after a change of the inputs, which are the
@@ -1184,7 +1184,7 @@ const PageDef * findPage(uint8_t number) {
 // (profile switch) and the keyboard mapping's codes (SET_KEYBOARD_MAPPING).
 static uint32_t stateToken = 1;
 static bool tokenStale = true;
-// The profile whose pin map and keyboard mapping were last hashed, as the
+// The profile with the pin map and keyboard mapping last hashed, as the
 // reinit applied it
 // (GP2040::getReinitGamepad, core 0)
 static uint32_t hashedProfile = 0;
@@ -1835,7 +1835,7 @@ bool commandImplemented(uint8_t command) { return findCommand(command) != nullpt
 // Session upkeep before each request and in each main-loop pass. A bus reset
 // is the one sign of a new host the board gets while it keeps power, so it
 // drops the replies still queued and ends a claim, as a change of holder.
-// The subscription stays. A host whose handle outlives the reset (a Linux
+// The subscription stays. A host with a handle that outlives the reset (a Linux
 // reset-resume) would lose it unseen, while it sees a lost claim at once.
 bool busResetSeen();
 

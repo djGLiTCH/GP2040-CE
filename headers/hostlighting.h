@@ -70,7 +70,7 @@ namespace HostLighting {
 	// lists its input pins.
 	void setup(bool expanderInputs);
 
-	// Modes whose configuration descriptor includes the lighting interface
+	// Modes with the lighting interface in their configuration descriptor
 	bool enabledForMode(InputMode mode);
 
 	// Whether HID instance itf is the lighting interface this boot
