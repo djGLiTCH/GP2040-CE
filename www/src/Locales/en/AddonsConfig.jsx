@@ -150,6 +150,12 @@ export default {
 		'Allow hosts to change the keyboard mapping',
 	'host-lighting-allow-keyboard-mapping-changes-help':
 		'Changes apply only to the active input profile.',
+	'host-lighting-report-mode-label': 'Lighting Report',
+	'host-lighting-report-mode-off': 'Off',
+	'host-lighting-report-mode-on': 'On',
+	'host-lighting-report-mode-auto': 'Auto (PC only in XInput)',
+	'host-lighting-report-mode-help':
+		'Adds a standard HID lighting interface with a red, green and blue value for each light, for software that drives lights through HID output values. The board shows the values from the first report until USB suspends or resets.',
 	'keyboard-host-header-text': 'Keyboard/Mouse Host Configuration',
 	'keyboard-host-sub-header-text': 'Keyboard Buttons',
 	'keyboard-host-mouse-header-text': 'Mouse Buttons',

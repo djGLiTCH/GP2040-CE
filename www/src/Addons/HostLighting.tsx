@@ -20,18 +20,29 @@ export const hostLightingScheme = {
 		.number()
 		.label('Host Lighting Allow Keyboard Mapping Changes')
 		.validateRangeWhenValue('HostLightingAddonEnabled', 0, 1),
+	hostLightingReportMode: yup
+		.number()
+		.label('Host Lighting Lighting Report Mode')
+		.validateRangeWhenValue('HostLightingAddonEnabled', 0, 2),
 };
 
 export const hostLightingState = {
 	HostLightingAddonEnabled: 0,
 	hostLightingXInputMode: 2,
 	hostLightingAllowKeyboardMappingChanges: 0,
+	hostLightingReportMode: 0,
 };
 
 const XINPUT_MODES = [
 	{ labelKey: 'host-lighting-xinput-mode-off', value: 0 },
 	{ labelKey: 'host-lighting-xinput-mode-on', value: 1 },
 	{ labelKey: 'host-lighting-xinput-mode-auto', value: 2 },
+];
+
+const REPORT_MODES = [
+	{ labelKey: 'host-lighting-report-mode-off', value: 0 },
+	{ labelKey: 'host-lighting-report-mode-on', value: 1 },
+	{ labelKey: 'host-lighting-report-mode-auto', value: 2 },
 ];
 
 const HostLighting = ({
@@ -70,6 +81,30 @@ const HostLighting = ({
 							</option>
 						))}
 					</FormSelect>
+				</Row>
+				<Row className="mb-3">
+					<FormSelect
+						label={t('AddonsConfig:host-lighting-report-mode-label')}
+						name="hostLightingReportMode"
+						className="form-select-sm"
+						groupClassName="col-sm-4 mb-3"
+						value={values.hostLightingReportMode}
+						error={errors.hostLightingReportMode}
+						isInvalid={Boolean(errors.hostLightingReportMode)}
+						onChange={handleChange}
+					>
+						{REPORT_MODES.map((mode, i) => (
+							<option
+								key={`hostLightingReportMode-option-${i}`}
+								value={mode.value}
+							>
+								{t(`AddonsConfig:${mode.labelKey}`)}
+							</option>
+						))}
+					</FormSelect>
+					<div className="small text-muted">
+						{t('AddonsConfig:host-lighting-report-mode-help')}
+					</div>
 				</Row>
 				<Row className="mb-3">
 					<FormCheck

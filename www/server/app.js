@@ -862,6 +862,7 @@ app.get('/api/getAddonsOptions', (req, res) => {
 		HostLightingAddonEnabled: 0,
 		hostLightingXInputMode: 2,
 		hostLightingAllowKeyboardMappingChanges: 0,
+		hostLightingReportMode: 0,
 		BuzzerSpeakerAddonEnabled: 1,
 		BootselButtonAddonEnabled: 1,
 		DualDirectionalInputEnabled: 1,
