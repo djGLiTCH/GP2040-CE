@@ -266,6 +266,7 @@ src/eventmanager.cpp
 src/layoutmanager.cpp
 src/hostlighting.cpp
 src/keyboardinterface.cpp
+src/lightingreport.cpp
 src/peripheralmanager.cpp
 src/storagemanager.cpp
 src/system.cpp

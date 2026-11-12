@@ -1505,6 +1505,8 @@ void ConfigUtils::initUnsetPropertiesWithDefaults(Config& config)
         HOST_LIGHTING_XINPUT ? HOST_LIGHTING_XINPUT_MODE_AUTO : HOST_LIGHTING_XINPUT_MODE_OFF);
     INIT_UNSET_PROPERTY(config.addonOptions.hostLightingOptions, allowKeyboardMappingChanges,
         !!HOST_LIGHTING_ALLOW_KEYBOARD_MAPPING_CHANGES);
+    INIT_UNSET_PROPERTY(config.addonOptions.hostLightingOptions, lightingReportMode,
+        (LightingReportMode)HOST_LIGHTING_REPORT_MODE);
 
     // addonOptions.gamepadUSBHostOptions
     INIT_UNSET_PROPERTY(config.addonOptions.gamepadUSBHostOptions, enabled, GAMEPAD_USB_HOST_ENABLED)

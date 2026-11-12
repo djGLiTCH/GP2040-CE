@@ -978,6 +978,7 @@ message HostLightingOptions
     optional bool enabled = 1;
     optional HostLightingXInputMode xinputMode = 2;
     optional bool allowKeyboardMappingChanges = 3;
+    optional LightingReportMode lightingReportMode = 4;
 }
 
 message AddonOptions
