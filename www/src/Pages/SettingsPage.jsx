@@ -25,6 +25,7 @@ import { hexToInt, rgbIntToHex } from '../Services/Utilities';
 
 import {
 	InputModeDeviceType,
+	KeyboardInterfaceMode,
 	PS4ControllerType,
 	Switch2ProColorPreset,
 	Switch2ProJoyCon2ColorPreset,
@@ -374,6 +375,21 @@ const GENERIC_DPAD_MODES = [
 	{ labelKey: 'generic-dpad-mode-options.hat-and-buttons', value: 0 },
 	{ labelKey: 'generic-dpad-mode-options.hat-only', value: 1 },
 	{ labelKey: 'generic-dpad-mode-options.buttons-only', value: 2 },
+];
+
+const KEYBOARD_INTERFACE_MODES = [
+	{
+		labelKey: 'keyboard-interface-mode-options.off',
+		value: KeyboardInterfaceMode.KEYBOARD_INTERFACE_MODE_OFF,
+	},
+	{
+		labelKey: 'keyboard-interface-mode-options.on',
+		value: KeyboardInterfaceMode.KEYBOARD_INTERFACE_MODE_ON,
+	},
+	{
+		labelKey: 'keyboard-interface-mode-options.auto',
+		value: KeyboardInterfaceMode.KEYBOARD_INTERFACE_MODE_AUTO,
+	},
 ];
 
 const SWITCH2_PRO_IDENTITIES = [
@@ -830,6 +846,11 @@ const schema = yup.object().shape({
 		.label('X-Input Authentication Type'),
 	debounceDelay: yup.number().required().label('Debounce Delay'),
 	miniMenuGamepadInput: yup.number().required().label('Mini Menu'),
+	keyboardInterfaceMode: yup
+		.number()
+		.required()
+		.oneOf(KEYBOARD_INTERFACE_MODES.map((o) => o.value))
+		.label('Keyboard Interface'),
 	inputModeB1: yup
 		.number()
 		.required()
@@ -935,6 +956,8 @@ const FormContext = ({ setButtonLabels, setKeyMappings }) => {
 			values.switch2ProColorPreset = parseInt(values.switch2ProColorPreset);
 		if (!!values.genericDpadMode)
 			values.genericDpadMode = parseInt(values.genericDpadMode);
+		if (!!values.keyboardInterfaceMode)
+			values.keyboardInterfaceMode = parseInt(values.keyboardInterfaceMode);
 
 		setButtonLabels({
 			swapTpShareLabels:
@@ -1141,6 +1164,15 @@ export default function SettingsPage() {
 			),
 		);
 
+	const handleMaskChange = (masked, button) =>
+		setKeyMappings((mappings) =>
+			mappings.map((mapping, index) =>
+				index === keyboardProfile
+					? { ...mapping, [button]: { ...mapping[button], masked } }
+					: mapping,
+			),
+		);
+
 	const generateDeviceTypeSelection = (
 		values,
 		errors,
@@ -1238,12 +1270,9 @@ export default function SettingsPage() {
 		);
 	};
 
-	const keyboardModeSpecifics = (
-		values,
-		errors,
-		setFieldValue,
-		handleChange,
-	) => {
+	// The keyboard mapping table. The send column sets the keyboard interface's
+	// button mask.
+	const keyboardMapping = (sendColumn) => {
 		return (
 			<div>
 				<Row className="mb-3">
@@ -1288,7 +1317,46 @@ export default function SettingsPage() {
 					buttonLabels={buttonLabels}
 					handleKeyChange={handleKeyChange}
 					getKeyMappingForButton={getKeyMappingForButton}
+					handleMaskChange={sendColumn ? handleMaskChange : undefined}
 				/>
+			</div>
+		);
+	};
+
+	const keyboardModeSpecifics = () => keyboardMapping(false);
+
+	const keyboardInterfaceSpecifics = (values, errors, handleChange) => {
+		return (
+			<div>
+				<Row className="mb-3">
+					<Col sm={4}>
+						<Form.Label>
+							{t('SettingsPage:keyboard-interface-mode-label')}
+						</Form.Label>
+						<Form.Select
+							name="keyboardInterfaceMode"
+							className="form-select-sm"
+							value={values.keyboardInterfaceMode}
+							onChange={handleChange}
+							isInvalid={errors.keyboardInterfaceMode}
+						>
+							{KEYBOARD_INTERFACE_MODES.map((o) => (
+								<option
+									key={`keyboard-interface-mode-option-${o.value}`}
+									value={o.value}
+								>
+									{t(`SettingsPage:${o.labelKey}`)}
+								</option>
+							))}
+						</Form.Select>
+					</Col>
+				</Row>
+				<Row className="mb-3">
+					<Col sm={10}>{t('SettingsPage:keyboard-interface-mode-text')}</Col>
+				</Row>
+				{Number(values.keyboardInterfaceMode) !==
+					KeyboardInterfaceMode.KEYBOARD_INTERFACE_MODE_OFF &&
+					keyboardMapping(true)}
 			</div>
 		);
 	};
@@ -1711,6 +1779,7 @@ export default function SettingsPage() {
 						/>
 					</Col>
 				</Row>
+				{keyboardInterfaceSpecifics(values, errors, handleChange)}
 				{usbOverride(values, errors, setFieldValue, handleChange)}
 			</div>
 		);
@@ -1779,6 +1848,7 @@ export default function SettingsPage() {
 						</Form.Select>
 					</Col>
 				</Row>
+				{keyboardInterfaceSpecifics(values, errors, handleChange)}
 				{usbOverride(values, errors, setFieldValue, handleChange)}
 			</div>
 		);
@@ -2465,6 +2535,8 @@ export default function SettingsPage() {
 				);
 			case 'input-mode-options.xbone':
 				return xboneModeSpecifics(values, errors, setFieldValue, handleChange);
+			case 'input-mode-options.sinput':
+				return keyboardInterfaceSpecifics(values, errors, handleChange);
 			case 'input-mode-options.nintendo-switch-pro':
 				return switchProModeSpecifics(values, setFieldValue);
 			case 'input-mode-options.nintendo-switch2-pro':
@@ -2504,6 +2576,10 @@ export default function SettingsPage() {
 
 	const onSubmit = async (values) => {
 		const isKeyboardMode = values.inputMode === 3;
+		const showsKeyboardInterface =
+			INPUT_MODES.find((o) => o.value == values.inputMode)?.keyboardInterface &&
+			Number(values.keyboardInterfaceMode) !==
+				KeyboardInterfaceMode.KEYBOARD_INTERFACE_MODE_OFF;
 
 		const data = {
 			...values,
@@ -2514,7 +2590,7 @@ export default function SettingsPage() {
 		if (values.forcedSetupMode > 1) {
 			setWarning({ show: true, acceptText: '' });
 		} else {
-			if (isKeyboardMode) {
+			if (isKeyboardMode || showsKeyboardInterface) {
 				const [baseMappings, ...profileMappings] = keyMappings;
 				await WebApi.setKeyMappings(baseMappings);
 				if (profileMappings.length)

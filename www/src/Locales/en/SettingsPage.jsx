@@ -77,6 +77,14 @@ export default {
 		'hat-only': 'Hat Only',
 		'buttons-only': 'Buttons Only',
 	},
+	'keyboard-interface-mode-label': 'Keyboard Interface',
+	'keyboard-interface-mode-options': {
+		off: 'Off',
+		on: 'On',
+		auto: 'Auto (PC only in XInput)',
+	},
+	'keyboard-interface-mode-text':
+		'Adds a keyboard beside the controller. A button switched on below that has a key sends the key instead of its controller input. In the analog D-pad modes the D-pad buttons move the stick and send no key.',
 	'switch-pro-controller-type-label': 'Controller Type',
 	'switch-pro-controller-type-options': {
 		pro: 'Pro Controller',
